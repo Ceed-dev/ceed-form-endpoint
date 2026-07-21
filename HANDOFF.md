@@ -16,18 +16,26 @@
 
 **本番URL**: `https://ceed-form-endpoint.vercel.app/api/submit`（チームメイトが `FORM_ENDPOINT` に設定する値）
 
-## 1. 進行中の依頼（チームメイトへSlackで送信済み・回答待ち）
+## 1. 進行中の依頼（チームメイトへSlackで送信済み・全て回答待ち）
 
-1. **DOC_URL**（資料DLリンク）— 未回答
-2. **ALLOWED_ORIGIN**（LP公開先オリジン、例 `https://ceed.cloud`）— 未回答
-3. **資料メール／通知メールの文面確認**（現状は仮文面、下記「メール文面」参照）— 未回答
-4. **通知メール受信確認**（`yusaku.takahashi@ceed.cloud` 宛にテスト送信済み、届いているか本人確認待ち）— 未回答
+**メッセージ1**:
+1. **DOC_URL**（資料DLリンク）
+2. **ALLOWED_ORIGIN**（LP公開先オリジン、例 `https://ceed.cloud`）
+3. **LPのHTMLファイル、または実URL**（現状APIの単体テスト（curl）のみで、実際のフォーム画面での送信→完了表示の挙動は未確認。CORSも`ALLOWED_ORIGIN`未設定のため実サイトからの疎通は未確認）
 
-**未送付だが検討中の追加依頼**: LPのHTMLファイル自体（または本番URL）の共有。現状APIの単体テスト（curl）のみで、実際のフォーム画面での送信→完了表示の挙動は未確認。CORSも`ALLOWED_ORIGIN`未設定のため実サイトからの疎通は未確認。
+**メッセージ2**:
+4. **資料メール／通知メールの文面確認**（現状は仮文面、下記「メール文面」参照）
+5. **通知メール受信確認**（`yusaku.takahashi@ceed.cloud` 宛にテスト送信済み、届いているか本人確認待ち）
 
-**回答が来たら次にやること**:
-- `vercel env add DOC_URL production` / `vercel env add ALLOWED_ORIGIN production` で値を設定 → `vercel --prod --yes` で再デプロイ
-- 文面変更の指示があれば `lib/mailer.js` の `sendDocumentEmail` / `sendNotificationEmail` 内の subject/text を修正
+**方針**: 本番エンドポイントURLは、`ALLOWED_ORIGIN`等の必須情報が全て揃うまでは開示しない（駿冴判断、2026-07-21）。
+
+**回答が来たら次にやること（順番）**:
+1. `vercel env add DOC_URL production` / `vercel env add ALLOWED_ORIGIN production` で値を設定 → `vercel --prod --yes` で再デプロイ
+2. LPファイル/URL受領後、実際のフォーム画面から送信テストしCORS・完了表示を確認
+3. 文面変更の指示があれば `lib/mailer.js` の `sendDocumentEmail` / `sendNotificationEmail` 内の subject/text を修正
+4. 通知メール受信確認結果を反映（問題なければ完了、届いてなければ再調査）
+5. 最終E2E確認（実LP→本番エンドポイント→2通のメール到達）
+6. 本番URLをチームメイトに共有して納品完了
 
 ## 2. アーキテクチャ・実装
 
