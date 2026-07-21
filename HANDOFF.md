@@ -1,0 +1,132 @@
+# Ceed Growth LP フォーム連携 — 作業引き継ぎドキュメント
+
+作成日: 2026-07-21 / 引き継ぎ元: 駿冴のローカルMac の Claude Code セッション
+
+このドキュメントだけ読めば、駿冴と本プロジェクトに関する会話・作業をそのまま継続できるよう、前提・背景・意思決定・現在状態・残タスクを自己完結で記載する。**作業内容を更新するたびに、このファイルも都度更新すること。**
+
+## ★ 現在の全体像（新規セッションはまずここを読む）
+
+**ビジネス背景**: Ceed の AI グロース支援 LP（`Ceed Growth LP v2.dc.html`、チームメイトが実装・保有。まだ現物は未共有）に「資料請求」フォームがあり、送信時に①送信者へ資料メール ②社内（`yusaku.takahashi@ceed.cloud`）へ通知メールを自動送信する必要がある。チームメイトから「残りの作業（バックエンド）」を引き継いだタスク。
+
+**採用方式**: Gmail API + OAuth2（ドメイン全体委任）。送信元 `noreply@ceed.cloud`。ホスティングは Vercel（Serverless Functions）。Mac miniは可用性懸念のため不採用（駿冴判断）。
+
+**現状（2026-07-21時点）**: バックエンド実装・デプロイ・Gmail送信・DKIM確認・レート制限まで**完了・動作確認済み**。ブロッカーは**チームメイトからの回答待ちのみ**（下記「進行中の依頼」参照）。
+
+**リポジトリ**: `/Users/shungo/Programming/ceed-form-endpoint`（GitHub: https://github.com/Ceed-dev/ceed-form-endpoint 、Public、Vercelと連携しpush時自動デプロイ）
+
+**本番URL**: `https://ceed-form-endpoint.vercel.app/api/submit`（チームメイトが `FORM_ENDPOINT` に設定する値）
+
+## 1. 進行中の依頼（チームメイトへSlackで送信済み・回答待ち）
+
+1. **DOC_URL**（資料DLリンク）— 未回答
+2. **ALLOWED_ORIGIN**（LP公開先オリジン、例 `https://ceed.cloud`）— 未回答
+3. **資料メール／通知メールの文面確認**（現状は仮文面、下記「メール文面」参照）— 未回答
+4. **通知メール受信確認**（`yusaku.takahashi@ceed.cloud` 宛にテスト送信済み、届いているか本人確認待ち）— 未回答
+
+**未送付だが検討中の追加依頼**: LPのHTMLファイル自体（または本番URL）の共有。現状APIの単体テスト（curl）のみで、実際のフォーム画面での送信→完了表示の挙動は未確認。CORSも`ALLOWED_ORIGIN`未設定のため実サイトからの疎通は未確認。
+
+**回答が来たら次にやること**:
+- `vercel env add DOC_URL production` / `vercel env add ALLOWED_ORIGIN production` で値を設定 → `vercel --prod --yes` で再デプロイ
+- 文面変更の指示があれば `lib/mailer.js` の `sendDocumentEmail` / `sendNotificationEmail` 内の subject/text を修正
+
+## 2. アーキテクチャ・実装
+
+```
+api/submit.js     — POST受付。CORS判定・レート制限・バリデーション・メール送信の呼び出し
+lib/validate.js   — 入力バリデーション（company/name/email必須、phone任意）
+lib/rateLimit.js  — IPベースのレート制限（Upstash Redis, 5回/10分）
+lib/mailer.js     — Gmail API送信（サービスアカウント + ドメイン全体委任）
+```
+
+- リクエスト仕様: `POST { company, name, email, phone? }` → 成功時 `{ok:true}` (200)
+- Node.js v22 / ESM / Vercel Functions（Node runtime、フレームワーク検出なし）
+
+## 3. メール文面（現状・仮）
+
+**①資料メール**（送信者宛、件名: `【Ceed】資料をお送りします`）
+```
+{会社名} {氏名} 様
+
+お問い合わせいただきありがとうございます。
+下記URLより資料をダウンロードいただけます。
+
+{DOC_URL}
+
+何かご不明点がございましたら本メールに返信ください。
+```
+
+**②通知メール**（`yusaku.takahashi@ceed.cloud` 宛、件名: `【LP】資料請求フォーム通知`、Reply-To=送信者）
+```
+資料請求フォームから送信がありました。
+
+会社名: {会社名}
+氏名: {氏名}
+メール: {メール}
+電話: {電話番号（未入力時は「(未入力)」）}
+```
+
+チームメイト確認待ち。変更指示が来たら`lib/mailer.js`を直接編集する。
+
+## 4. インフラ・認証情報（重要な意思決定と落とし穴）
+
+### Google Workspace / ドメイン構成
+- **Workspaceの契約は `0xqube.xyz`**。`ceed.cloud` はセカンダリドメインとして追加されている（駿冴確認済み）。
+- 管理者アカウント: `pochi@0xqube.xyz`（駿冴自身）
+- `ceed.cloud` の MX は **`ceed.sakura.ne.jp`**（Sakuraのメールサーバー）を向いている。Google Workspace経由ではない。`yusaku.takahashi@ceed.cloud` は実在しSakura側で運用中（駿冴確認済み、問題なし。Gmail APIでの送信はSMTP配送なのでSakura宛でも支障ない）。
+- `official@ceed.cloud` という既存のSend As設定（SMTP経由・ceed.sakura.ne.jp）が既にあった。**これは触っていない・無関係**。
+
+### GCP
+- プロジェクト: `ceed-form-endpoint`（`pochi@0xqube.xyz` で作成）
+- Gmail API有効化済み
+- サービスアカウント: `ceed-form-mailer@ceed-form-endpoint.iam.gserviceaccount.com`
+- キーファイル: `sa-key.json`（**ローカルのみ、gitignore対象。GitHubにはpushされていない**。別マシンで作業する場合はこのファイルを安全な方法で移動するか、`gcloud iam service-accounts keys create`で新規キーを発行する必要がある）
+- ドメイン全体の委任: admin.google.com → セキュリティ → API制御 → ドメイン全体の委任 に **クライアントID `110536984423551484683`、スコープ `https://www.googleapis.com/auth/gmail.send`** を登録済み（確認済み・動作済み）
+
+### Gmail送信元エイリアス（★ハマりポイント）
+- `pochi@0xqube.xyz`（Shungo Kimura）ユーザーに `noreply@ceed.cloud` を**エイリアスとして追加**（admin.google.com → Directory → Users → 対象ユーザー → Alternate emails）
+- **これだけでは不十分**。Gmail側で送信すると From ヘッダーが主アドレス（`pochi@0xqube.xyz`）に差し戻される現象が発生した。
+- **解決策**: 送信アカウント本人のGmail設定 → 設定 → アカウントとインポート → 「名前を含むメールの送信」→ **Add another email address** で `noreply@ceed.cloud` を追加（同ドメインのため確認コード不要・即時反映）。これで実際に外部アドレス（`kimura.shungo@gmail.com`）宛にテストし、`From: noreply@ceed.cloud` かつ `signed-by: ceed.cloud`（DKIM）を確認済み。
+
+### DKIM/SPF/DMARC
+- 調査時点で**既に設定済み**だった（誰か/何かが事前に設定していた形跡、6日前作成のレコードあり）。追加作業は不要だった。
+- DMARCの`rua`は既に`yusaku.takahashi@ceed.cloud`宛になっていた。
+
+### コードの不具合修正（googleapisライブラリの破壊的変更）
+- `googleapis`パッケージ（v173系にアップグレード、npm audit脆弱性解消のため）で`google.auth.JWT`のコンストラクタが**位置引数からオプションオブジェクトに変更**されていた。旧形式のまま呼ぶと`invalid_client`エラーになる。
+- 修正済み: `lib/mailer.js`で`new google.auth.JWT({ email, key, scopes, subject })`形式に変更済み。
+
+### Vercel
+- チーム: `ceed`（`pochiudon`アカウントでログイン、`ceed.cloud`ドメインもこのチームで管理）
+- プロジェクト: `ceed-form-endpoint`（GitHub連携済み、push→自動デプロイ）
+- **GitHub連携の落とし穴**: CeedチームはHobbyプランのため、Organization所有の**Privateリポジトリ**とはネイティブ連携できない（Proプラン限定の制約）。解決策として**リポジトリをPublicに変更**して連携（駿冴合意済み。機密情報はコード内に含まれていないため問題なしと判断）。
+- レート制限用Redis: Vercel Marketplace経由で **Upstash for Redis（Freeプラン）** を追加・プロジェクトに接続済み。環境変数名は`UPSTASH_REDIS_REST_URL/TOKEN`ではなく**`KV_REST_API_URL` / `KV_REST_API_TOKEN`**（Vercel側の命名）。`lib/rateLimit.js`はこの命名に対応済み。
+
+### 環境変数（Vercel Production、設定済み）
+| 変数 | 値/状態 |
+|---|---|
+| `GOOGLE_SERVICE_ACCOUNT_EMAIL` | 設定済み |
+| `GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY` | 設定済み |
+| `GMAIL_SENDER` | `noreply@ceed.cloud` |
+| `NOTIFY_TO` | `yusaku.takahashi@ceed.cloud` |
+| `KV_REST_API_URL` / `KV_REST_API_TOKEN` | 設定済み（Upstash自動連携） |
+| `DOC_URL` | **未設定（チームメイト回答待ち）** |
+| `ALLOWED_ORIGIN` | **未設定（チームメイト回答待ち）** |
+
+## 5. 動作確認済みの内容
+
+- ローカル単体テスト: バリデーション6パターン、CORS/メソッド分岐5パターン、全PASS
+- `npm audit`: 脆弱性0件
+- 本番エンドポイントへのcurlテスト: バリデーション400、成功200を確認
+- Gmail実送信テスト: `pochi@0xqube.xyz`宛・外部`kimura.shungo@gmail.com`宛の両方で資料メール到達確認（受信トレイ直行、迷惑メール行きなし、DKIM署名確認）
+- 通知メール送信テスト: API経由で成功レスポンス確認（実際の受信確認は本人待ち）
+- レート制限: 同一IPから6回連続送信し、6回目で`429`を確認
+
+## 6. 各アカウントのログイン状態（このマシン上）
+
+- `gcloud`: `pochi@0xqube.xyz`がアクティブ
+- `vercel`: `pochiudon`（Ceedチーム）でログイン済み
+- `gh`(GitHub CLI): `shungo0222`でログイン、`Ceed-dev`組織へのアクセス権あり
+
+## 7. 参考ドキュメント
+
+- セットアップ手順の詳細は [README.md](./README.md) を参照（GCP/Workspace/DNS/Vercelの具体的なコマンド・手順）
