@@ -47,6 +47,8 @@ gcloud iam service-accounts keys create sa-key.json \
 2. **ドメイン全体委任**: セキュリティ → API制御 → ドメイン全体の委任 → 新規追加
    - クライアントID: サービスアカウントの「一意のID」（数字）
    - スコープ: `https://www.googleapis.com/auth/gmail.send`
+3. **Send Mail As登録（重要）**: 上記1のエイリアスを追加しただけではFromヘッダーが主アドレスに差し戻される。
+   送信用アカウントのGmail設定 → アカウントとインポート → 「名前を含むメールの送信」→ `noreply@ceed.cloud`を追加（同ドメインのため確認不要で即時反映）
 
 ### 3. DKIM/SPF/DMARC（Vercelのドメイン管理でDNSレコード追加）
 
