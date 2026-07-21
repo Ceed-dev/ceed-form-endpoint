@@ -50,6 +50,7 @@ export default async function handler(req, res) {
 
   try {
     await sendDocumentEmail({ toEmail: data.email, name: data.name, company: data.company });
+    console.log("document email sent", data.company);
   } catch (err) {
     console.error("failed to send document email", err);
     res.status(500).json({ error: "failed to send document email" });
@@ -58,6 +59,7 @@ export default async function handler(req, res) {
 
   try {
     await sendNotificationEmail(data);
+    console.log("notification email sent", data.company);
   } catch (err) {
     console.error("failed to send notification email", err);
   }
