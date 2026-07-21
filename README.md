@@ -23,7 +23,7 @@ Ceed Growth LPの「資料請求」フォームを受け、Gmail API経由で
 | `NOTIFY_TO` | 通知先（`yusaku.takahashi@ceed.cloud`） |
 | `DOC_URL` | 資料DLリンク（要確認） |
 | `ALLOWED_ORIGIN` | LP公開先オリジン（要確認、CORS許可用） |
-| `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` | レート制限用（任意、Vercel Marketplace経由でUpstash追加時に自動設定） |
+| `KV_REST_API_URL` / `KV_REST_API_TOKEN` | レート制限用（Vercel Marketplace経由でUpstash for Redisを追加時に自動設定。設定済み） |
 
 ## セットアップ手順
 
