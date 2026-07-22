@@ -10,7 +10,7 @@
 
 **採用方式**: Gmail API + OAuth2（ドメイン全体委任）。送信元 `noreply@ceed.cloud`。ホスティングは Vercel（Serverless Functions）。Mac miniは可用性懸念のため不採用（駿冴判断）。
 
-**現状（2026-07-21更新）**: バックエンド・LP公開・結線・通知メール確認まで**全て完了**。残る唯一のブロッカーは**DOC_URL（資料PDF）待ち**。
+**現状（2026-07-22更新）**: **本体タスクは完了**。DOC_URLも設定済み・最終E2E確認済み。残るのはメール文面の微調整のみ（チームメイト側に引き継ぎ済み、任意タイミング）。
 
 **リポジトリ**:
 - バックエンド: `/Users/shungo/Programming/ceed-form-endpoint`（GitHub: https://github.com/Ceed-dev/ceed-form-endpoint 、Public、Vercelと連携しpush時自動デプロイ）
@@ -19,17 +19,21 @@
 **本番URL**:
 - LP: `https://lp.ceed.cloud`（公開済み・稼働中）
 - フォームAPI: `https://ceed-form-endpoint.vercel.app/api/submit`（LPの`FORM_ENDPOINT`に設定済み）
+- 資料PDF（DOC_URL）: `https://lp.ceed.cloud/assets/ceed-guide.pdf`（設定済み・動作確認済み）
 
-## 1. 残タスク（唯一のブロッカー）
+## 1. 残タスク
 
-**DOC_URL（資料PPTX/PDF）待ち**: チームメイトから受け取ったhandoff資料（`~/Downloads/handoff/`）にはPPTXファイル名（`ceed-ai-growth-service-guide-…v3.pptx`）の言及のみで、実ファイル・Driveリンクは含まれていなかった。ファイル本体またはDriveリンクの共有をSlackで依頼済み、回答待ち。
+**本質的なタスクは全て完了。** 残っているのは以下のみ、いずれも非ブロッキング：
+- メール文面の微調整（チームメイト側のClaude Codeセッションに引き継ぎ済み。`lib/mailer.js`のsubject/text）
+- スマホでのLP表示・送信確認（駿冴判断で保留中、必要になったら実施）
 
-**回答が来たら次にやること**:
-1. PPTXを受け取ったらPDF化
-2. `/Users/shungo/Programming/ceed-growth-lp/assets/`に配置 → 例 `https://lp.ceed.cloud/assets/ceed-guide.pdf`
-3. `vercel env add DOC_URL production`（`ceed-form-endpoint`側）で設定 → 再デプロイ
-4. 最終E2E確認（実LP→本番エンドポイント→資料メールのリンクが正しく開けるか）
-5. 納品完了報告（公開URL・FORM_ENDPOINT・環境変数一覧・DKIM設定内容・DOC_URLは全てHANDOFF.md/README.mdに記載済み）
+**完了した最終確認（2026-07-22）**:
+1. PPTX資料（`~/Downloads/株式会社Ceed サービスご説明資料.pdf`、4.8MB）を受領 → `ceed-growth-lp/assets/ceed-guide.pdf`に配置
+2. `DOC_URL=https://lp.ceed.cloud/assets/ceed-guide.pdf`を`ceed-form-endpoint`のVercel環境変数に設定 → 再デプロイ
+3. 実際にフォーム送信 → 資料メールに正しいDOC_URLが記載され、PDFが正常に開くことを確認
+4. 通知メール（`yusaku.takahashi@ceed.cloud`宛）到達も確認
+
+**もし今後DOC_URLを差し替える場合**: `ceed-growth-lp/assets/`のPDFを置き換えてpush（自動デプロイ）。ファイル名を変える場合は`ceed-form-endpoint`側で`vercel env add DOC_URL production`を再実行し、再デプロイが必要。
 
 ## 1.5 解決済みの経緯（後から見て「あれ？」とならないための記録）
 
