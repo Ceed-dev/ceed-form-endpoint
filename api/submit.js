@@ -1,6 +1,7 @@
 import { validateSubmission } from "../lib/validate.js";
 import { checkRateLimit } from "../lib/rateLimit.js";
 import { sendDocumentEmail, sendNotificationEmail } from "../lib/mailer.js";
+import { forwardToLeadDashboard } from "../lib/forward.js";
 
 function applyCors(req, res) {
   const allowedOrigin = process.env.ALLOWED_ORIGIN;
@@ -62,6 +63,12 @@ export default async function handler(req, res) {
     console.log("notification email sent", data.company);
   } catch (err) {
     console.error("failed to send notification email", err);
+  }
+
+  try {
+    await forwardToLeadDashboard(data);
+  } catch (err) {
+    console.error("failed to forward to lead dashboard", err);
   }
 
   res.status(200).json({ ok: true });

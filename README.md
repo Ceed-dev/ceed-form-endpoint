@@ -24,6 +24,8 @@ Ceed Growth LPの「資料請求」フォームを受け、Gmail API経由で
 | `DOC_URL` | 資料DLリンク（要確認） |
 | `ALLOWED_ORIGIN` | LP公開先オリジン（要確認、CORS許可用） |
 | `KV_REST_API_URL` / `KV_REST_API_TOKEN` | レート制限用（Vercel Marketplace経由でUpstash for Redisを追加時に自動設定。設定済み） |
+| `LEADGEN_WEBHOOK_URL` | リードダッシュボードのWebhook URL |
+| `FORM_SHARED_SECRET` | リードダッシュボードとの共有シークレット |
 
 ## セットアップ手順
 
@@ -77,6 +79,15 @@ curl -i -X POST https://<endpoint>/api/submit \
   -H "Origin: https://<LP本番オリジン>" \
   -d '{"company":"テスト株式会社","name":"テスト太郎","email":"test@example.com","phone":"090-0000-0000"}'
 ```
+
+## リードダッシュボードへの転送
+
+送信された内容は、資料メール・通知メールの送信後に**リードダッシュボード**（`/webhooks/form`）へも転送される（`lib/forward.js`）。
+
+- 転送する項目: `email`（メール）・`companyName`（会社名）・`contactName`（氏名）・`phone`（電話、未入力時は送らない）・`source`（固定で`lp-form`）
+- `FORM_SHARED_SECRET`の値は、リードダッシュボード側（Worker）に設定されている同名シークレットの値と一致させる必要がある
+- `LEADGEN_WEBHOOK_URL` / `FORM_SHARED_SECRET`が未設定の場合は転送をスキップする（警告ログのみ）
+- 転送はLPの送信者からは**完全に不可視（fire-and-forget）**。転送が失敗してもLPユーザーへのレスポンスは変わらず`200 {ok:true}`のまま（ログにのみ記録）
 
 ## 未確定事項
 
